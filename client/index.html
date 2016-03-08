@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<style>
+	body{
+		background-color: lightblue;
+		}
+	</style>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        "use strict";
+		// Canvas stuff
+        var canvas;
+        var ctx;
+		
+		// Socket stuff
+        var socket;
+		
+		// Drawing
+		var draws = {};
+		var animationFrame;
+		
+		// Input bools
+		var wPressed = false;
+		var aPressed = false;
+		var sPressed = false;
+		var dPressed = false;
+		
+		
+        var square = {
+            frame: new Date().getTime(),
+			time: new Date().getTime(),
+            x: Math.random()*400,
+            y: Math.random()*400,
+            height: 100,
+            width: 100,
+			color: "rgba("+Math.floor(Math.random()*255)+", "+Math.floor(Math.random()*255)+", "+Math.floor(Math.random()*255)+", 1)"
+        };
+		
+		function redraw()
+		{
+			ctx.clearRect(0,0,canvas.width, canvas.height);
+			var key = Object.keys(draws);
+			
+			for(var i = 0;i<key.length;i++)
+			{
+				var drawCall = draws[key[i]];
+				ctx.fillStyle = draws[key[i]].color;
+				ctx.fillRect(drawCall.x, drawCall.y, drawCall.width, drawCall.height);
+			}
+		}
+		
+		// Update
+		function update()
+		{
+			animationFrame = requestAnimationFrame(update);
+			// Update Square location based on input
+			if(wPressed)
+			{
+				square.y -= 1;
+			}
+			
+			if(aPressed)
+			{
+				square.x -= 1;
+			}
+			
+			if(sPressed)
+			{
+				square.y += 1;
+			}
+			
+			if(dPressed)
+			{
+				square.x += 1;
+			}
+			
+			// Sends position if any key pressed
+			if(wPressed || aPressed || sPressed || dPressed)
+			{
+				sendPos();
+			}
+		}
+		
+		// Sends position to server
+		function sendPos()
+		{
+			var message = 
+			{
+				message: "",
+				frame: square.frame,
+				data: square,
+				time: new Date().getTime()
+			};
+			
+			socket.emit("updatePos", message);
+		}
+        
+        function init() 
+		{
+			// sets up canvas
+            canvas = document.querySelector("#canvas");
+            ctx = canvas.getContext("2d");
+			
+			// sets up socket
+			socket = io.connect();
+			
+			// sends inital message on connect
+			socket.on("connect", function()
+			{
+				var message = 
+				{
+					message: "",
+					frame: square.frame,
+					data: square
+				};
+				socket.emit("init", message);
+			});
+			
+			// sends data to all squares
+			socket.on("updateSquares", function(data)
+			{
+				draws = data.data;
+				redraw();
+			});
+			
+			// Do this if a key is down
+			document.onkeydown = function(e)
+			{
+				var charCode = String.fromCharCode(e.keyCode);
+				if(charCode == "W")
+				{
+					wPressed = true;
+				}
+				
+				if(charCode == "A")
+				{
+					aPressed = true;
+				}
+				
+				if(charCode == "S")
+				{
+					sPressed = true;
+				}
+				
+				if(charCode == "D")
+				{
+					dPressed = true;
+				}
+			};
+			
+			// Checks which keys is up
+			document.onkeyup = function(e)
+			{
+				var charCode = String.fromCharCode(e.keyCode);
+				if(charCode == "W")
+				{
+					wPressed = false;
+				}
+				
+				if(charCode == "A")
+				{
+					aPressed = false;
+				}
+				
+				if(charCode == "S")
+				{
+					sPressed = false;
+				}
+				
+				if(charCode == "D")
+				{
+					dPressed = false;
+				}
+			};
+			
+			// updates frames
+			requestAnimationFrame(update);
+        }
+		
+	// when it loads do init
+    window.onload = init;
+	
+	// remove square before leaving.
+	window.onbeforeunload = function()
+	{
+		var message = 
+		{
+			message: "",
+			frame: square.frame,
+			data: ""
+		};
+		socket.emit("leaving", message);
+	};
+    </script>
+</head>
+<body>
+    <canvas id="canvas" height="1500" width="1500">Please use an HTML 5 browser</canvas>
+</body>
+</html>
